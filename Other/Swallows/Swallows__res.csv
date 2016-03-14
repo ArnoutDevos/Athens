@@ -1,0 +1,2 @@
+Date;DisplayPeriod;GroupOffset;GroupSlope;Icon;Inertia;NbAgents;ScenarioName;TimeLimit;TimeSlope;Title;LastStep;Proportion of swallows perched;Perching probability x 1000
+151116105138;1;8;1;swallow.gif;2;400;Swallows;1000;20;Evolife_Swallows;1000;65;12

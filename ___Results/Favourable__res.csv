@@ -1,0 +1,2 @@
+Date;AgeMax;BatchMode;CollectiveBenefit;Cumulative;DNAFill;DisplayPeriod;DumpStart;GeneCoding;GeneLength;GroupMinSize;Icon;IndividualBenefit;MaxGurus;MutationRate;NbCrossover;NumberOfGroups;PopulationSize;ReproductionRate;ResultDir;Rounds;ScenarioName;SelectionPressure;Selectivity;StartFromFile;TimeLimit;Title;LastStep;favourable;neutral
+160305191327;1000;0;0;0;0;10;100;Weighted;8;0;QtGraphics/EvolifeIcon.png;10;1;5;1;1;200;20;./___Results;1;Favourable;5;0;0;20000;Evolife;126;98;5

@@ -1,0 +1,487 @@
+##############################################################################
+# SocialNetwork   www.dessalles.fr/Evolife              Jean-Louis Dessalles #
+#                 Telecom ParisTech  2014                www.dessalles.fr    #
+##############################################################################
+
+
+""" Study of the role of social selection on moral values:
+Individuals adopt moral standards and have moral demands for their friends.
+Links are supposed to be symmetrical.
+"""
+
+
+#import math
+from time import sleep
+from random import randint, random, sample, choice
+
+import sys
+import os.path
+sys.path.append('../../..')
+
+import Evolife.QtGraphics.Evolife_Window 
+import Evolife.QtGraphics.Evolife_Batch 
+import Evolife.Scenarii.Parameters 
+from Evolife.Tools.Tools import boost, LimitedMemory, error
+from Evolife.Ecology.Observer import Experiment_Observer
+from Evolife.Ecology.Alliances import Alliances
+from Evolife.Scenarii.S_Signalling import Interactions
+
+
+# Global elements
+class Global:
+	def __init__(self):
+		# General functions
+		# Closer pushes x towards Target
+		self.Closer = lambda x, Target, Attractiveness: ((100.0 - Attractiveness) * x + Attractiveness * Target) / 100
+		# Perturbate is a mutation function
+		self.Perturbate = lambda x, Amplitude: x + (2 * random() - 1) * Amplitude
+		# Limitate keeps x within limits
+		self.Limitate = lambda x, Min, Max: min(max(x,Min), Max)
+		# Decrease is a linear decreasing function between 100 and MinY
+		self.Decrease = lambda x, MaxX, MinY: max(MinY, (100 - x * ((100.0 - MinY)/ MaxX)))
+
+		# Parameter values
+		self.Parameters = Evolife.Scenarii.Parameters.Parameters('_Params.evo')
+		self.ScenarioName = self.Param('ScenarioName')
+		# Definition of interaction
+		self.Interactions = None	# to be overloaded
+
+	@staticmethod
+	def Saturate(n, v):
+		""" saturated linear function between 0 and 1 """
+		R = 1
+		if v >= 0 and v <= 100:
+			for m in range(n):	R *= (100.0 - v)/100.0
+			return 1 - R
+		return error('Saturate called with inappropriate value')
+			
+	def Dump_(self, PopDump, ResultFileName, Verbose=False):
+		""" Saves parameter values, then agents' investment in signalling, then agents' distance to best friend
+		"""
+		if Verbose:
+			print "Saving data to %s.*" % ResultFileName
+		SNResultFile = open(ResultFileName + '.res', 'a')
+		SNResultFile.write('\n' + ";".join(PopDump('Morality')))	  
+		SNResultFile.write('\n' + ";".join(PopDump('DistanceToBestFriend')))	  
+		SNResultFile.close()
+
+	def Param(self, ParameterName):	return self.Parameters.Parameter(ParameterName)
+
+Gbl = Global()
+
+
+
+if Gbl.Param('BatchMode'):
+	boost()   # A technical trick that sometimes provides impressive speeding up
+else:
+	print boost()   # A technical trick that sometimes provides impressive speeding up
+	print "\nInteraction scenario: %s\n\n" % Gbl.ScenarioName
+
+
+
+class Social_Observer(Experiment_Observer):
+	" Stores some global observation and display variables "
+
+	def __init__(self, Parameters):
+		Experiment_Observer.__init__(self, Parameters)
+		#additional parameters	  
+		self.NbAgents = Parameters.Parameter('NbAgents')	 # total number of agents
+		self.Positions = dict() # position of agents, for display
+		self.Alliances = []
+		self.Cluster = (0,0)	# position and size of main cluster
+		self.AvgFeatures = dict()
+		
+	def get_data(self, Slot):
+		if Slot == 'Positions':	return self.Positions.items()	
+		elif Slot == 'Network':	return self.Alliances
+		else:   return Experiment_Observer.get_data(self, Slot)
+
+	def get_info(self, Slot):
+		if Slot == 'PlotOrders':
+			try:
+				return [('white', (self.StepId, self.AvgFeatures['Morality'])),
+						# ('red', (self.StepId, self.AvgFeatures['MoralDemand'])),
+						('blue', (self.StepId, self.Cluster[0])),
+						('green', (self.StepId, self.Cluster[1]))]
+			except KeyError:	return []
+		elif Slot == 'CurveNames':	
+			return [('white','Average Morality'), 
+					# ('red', 'Average Moral Demand'),
+					('blue', 'Main Cluster Position'),
+					('green', 'Main Cluster Size')]
+		elif Slot == 'ResultOffset': return Gbl.Param('DumpStart') # minimum x-value when computing curve average 
+		else:   return Experiment_Observer.get_info(self, Slot)
+
+	def hot_phase(self):
+		return self.StepId < self.TimeLimit * Gbl.Param('LearnHorizon') / 100.0
+
+class Learner:
+	"	defines learning capabilities "
+	def __init__(self, Features, MemorySpan=1, AgeMax=100, Infancy=0, Imitation=0, Speed=1, Conservatism=0):
+		self.Features = Features	# Dictionary of variables: values that will be learned
+		self.MemorySpan = MemorySpan
+		self.Scores = LimitedMemory(self.MemorySpan)  # memory of past benefits
+		self.AgeMax = AgeMax
+		self.Performance = []	# stores current performances
+		self.Infancy = Infancy	# percentage of lifetime when the learner is considered a child
+		self.Imitation = Imitation	# forced similarity wiht neighbouring values when learning continuous function
+		self.Speed = Speed	# learning speed
+		self.Conservatism = Conservatism
+		self.Reset()
+		self.Age = randint(0, AgeMax)	# age is random at initialization
+		
+	def Reset(self):
+		self.Age = 0
+		for F in self.Features:	self.Features[F] = randint(0,100)
+		# for F in self.Features:	self.Features[F] = 0
+		self.Scores.reset()
+
+	def adult(self):	return self.Age > self.AgeMax * self.Infancy / 100.0
+
+	def feature(self, F, Value=None):
+		if Value is not None:	self.Features[F] = Value
+		return self.Features[F]
+			
+	def imitate(self, models, Feature):
+		" the individual moves its own feature closer to its models' features "
+		TrueModels = [m for m in models if m.adult()]
+		if TrueModels:
+			ModelValues = map(lambda x: x.feature(Feature), TrueModels)
+			Avg = float(sum(ModelValues)) / len(ModelValues)
+			return Gbl.Closer(self.feature(Feature), Avg, self.Imitation)
+		return self.feature(Feature)
+
+	def explore(self, Feature, Speed):
+		"   the individual changes its feature to try to get more points "
+		# print self.Scores.past
+		if self.Scores.Length() > 0:
+			# retrieve the SECOND best solution so far
+			if self.Scores.Length() > 1:
+				# Best = sorted(self.Scores.retrieve(), key = lambda x: x[1])[-2][0][Feature]
+				past = self.Scores.retrieve()[:]
+				Best = max(past, key = lambda x: x[1])
+				past.remove(Best)
+				Best = max(past, key = lambda x: x[1])[0][Feature]
+			else:
+				Best = self.Scores.last()[0][Feature]
+			# Best = sorted(self.Scores.retrieve(), key = lambda x: x[1])[-1][0][Feature]
+			# # # bestvalue = sorted([b[1] for b in self.Scores.retrieve()])[-1]
+			# # # avg = float(sum([b[1] for b in self.Scores.retrieve()]))
+			# # # if len(self.Scores.retrieve()):	avg /= len(self.Scores.retrieve())
+			# # # print '%0.3f' % (bestvalue-avg),
+		else:	Best = self.Features[Feature]
+		# print self.Scores, sorted(self.Scores.retrieve(), key = lambda x: x[1])[-1]
+		# print self.feature(Feature),
+		Target = Gbl.Limitate(Gbl.Perturbate(Best, Speed), 0, 100)
+		return Gbl.Closer(Target, self.feature(Feature), self.Conservatism)
+
+	def Learns(self, neighbours, hot=True):
+		""" Learns by randomly changing current value.
+			Starting point depends on previous success and on neighbours.
+			If 'hot' is true, perturbation is larger for children 
+		"""
+		if self.Age > self.AgeMax:
+			self.Reset()
+		self.Age += 1
+		# Averaging performances obtained for current feature values
+		Performance = 0
+		if len(self.Performance): Performance = float(sum(self.Performance)) / len(self.Performance)
+		self.Performance = []	# resetting performance
+		self.Scores.push((self.Features.copy(), Performance))	# storing current performance
+		if self.Age == 1:	return False	# Newborn, no learning
+
+		# get features closer to neighbours' values
+		if self.Imitation:
+			for F in self.Features:	self.feature(F, self.imitate(neighbours, F))
+
+		if hot and not self.adult():	# still a kid
+			LearningSpeed = Gbl.Decrease(self.Age, self.Infancy, self.Speed)
+		else:	LearningSpeed = self.Speed
+			
+		# compromise between current value and a perturbation of past best value
+		for F in self.Features:	self.feature(F, self.explore(F, LearningSpeed))
+		return True
+
+	def wins(self, Points):
+		"   stores a benefit	"
+		self.Performance.append(Points)
+	
+
+
+class Individual(Alliances, Learner):
+	"   defines what an individual consists of "
+
+	def __init__(self, IdNb, NbAgents):
+		self.id = "A%d" % IdNb	# Identity number
+		Alliances.__init__(self,Gbl.Param('MaxGurus'),Gbl.Param('MaxFollowers'))
+		self.Quality = (100.0 * IdNb) / NbAgents # quality may be displayed
+		# Learnable features
+		Features = {
+			'Morality': 0,   # propensity to be moral oneself
+			# 'MoralDemand': 0,   # moral demands for friends
+			}
+		Learner.__init__(self, Features, MemorySpan=Gbl.Param('MemorySpan'), AgeMax=Gbl.Param('AgeMax'), 
+							Infancy=Gbl.Param('Infancy'), Imitation=Gbl.Param('ImitationStrength'), 
+							Speed=Gbl.Param('LearningSpeed'), Conservatism=Gbl.Param('LearningConservatism'))
+		self.Points = 0	# stores current performance
+		self.update()
+
+	def update(self, infancy=True):
+		"	updates values for display "
+		# if self.adult():	Colour = 'brown'
+		# else:	Colour = 'pink'
+		Colour = 'green%d' % int(1 + 10 * (1 - float(self.Age)/(1+Gbl.Param('AgeMax'))))
+		if infancy and not self.adult():	Colour = 'red'
+		# Benefit = self.Scores.last()
+		# if Benefit is None:	Benefit = (self.Features.copy(), 0)
+		Benefit = 0
+		if self.Performance: Benefit = self.Performance[-1]
+		MinY = Gbl.Param('SignallingCost')
+		BestFriend = self.best_friend()
+		if BestFriend is not None:
+			BFBenefit = 0
+			if BestFriend.Performance:	BFBenefit = BestFriend.Performance[-1]
+		# Position: (x, y, colour, size of blob in display, toX, toY, segmentColour, thickness)
+		# self.Position = (self.feature('Morality'), self.feature('MoralDemand'), Colour, 5)	
+		# self.Position = (self.feature('MoralDemand'), self.feature('Morality'), Colour, 5)	
+		# self.Position = (self.Quality, self.feature('Morality'), Colour, 4, self.Quality, self.feature('MoralDemand'), 'blue',2)	
+		# self.Position = (self.feature('Morality'), self.Quality, Colour, 4)	
+		if Gbl.Param('Links') and BestFriend is not None:
+			self.Position = (self.feature('Morality'), 
+				# MinY+Benefit, 
+				self.Quality,
+				Colour, 4, BestFriend.feature('Morality'), 
+				# MinY+BFBenefit, 
+				BestFriend.Quality,
+				'blue',1)
+		else:
+			self.Position = (self.feature('Morality'), 
+			# MinY+Benefit, 
+			self.Quality,
+			Colour, 4)
+		# self.Position = (self.feature('MoralDemand'), MinY+Benefit, Colour, 4)	
+		# self.Position = (self.feature('Morality'), MinY+Benefit, Colour, 4, self.feature('Morality'), self.feature('MoralDemand'), 'blue',2)	
+
+
+	def Interact(self, Partner):
+		""" The two individuals negotiate partnership.
+			They become friends if 
+			- the other's morality exceeds one's demand for morality
+			- the other's current friends' morality exceeds one's demand for morality
+		"""
+		# new interaction puts previous ones into question
+		if self in Partner.gurus.names():	Partner.quit_(self)
+		if Partner in self.gurus.names():	self.quit_(Partner)
+
+		# Negotiation takes place
+		# if self.feature('Morality') < Partner.feature('Morality') * Gbl.Param('Tolerance')/100.0:	return False
+		# if Partner.feature('Morality') < self.feature('Morality') * Gbl.Param('Tolerance')/100.0:	return False
+		# if self.feature('Morality') < Partner.feature('Morality') + Gbl.Param('Tolerance') - 100.0:	return False
+		# if Partner.feature('Morality') < self.feature('Morality') + Gbl.Param('Tolerance') - 100.0:	return False
+		if Gbl.Param('SecondOrder'):
+			for PF in Partner.friends():
+				if PF.feature('Morality') < self.feature('Morality') * Gbl.Param('Tolerance')/100.0:	return False
+			for SF in self.friends():
+				if SF.feature('Morality') < Partner.feature('Morality') * Gbl.Param('Tolerance')/100.0:	return False
+		
+		# MM = min(Partner.feature('Morality'), self.feature('Morality'))
+		# if self.get_friend(self.Quality, Partner, Partner.Quality):	pass
+		# self.follows(self.Quality, Partner, Partner.Quality)
+		# Partner.follows(Partner.Quality, self, self.Quality)
+		# self.follows(self.feature('Morality'), Partner, Partner.feature('Morality'))
+		# Partner.follows(Partner.feature('Morality'), self, self.feature('Morality'))
+		if self.get_friend(self.feature('Morality'), Partner, Partner.feature('Morality')):	pass
+		
+
+				
+		# # # # # # if not self.follows(self.feature('Morality'), Partner, Partner.feature('Morality')):	return False
+		# # # # # # if not self.follows(1, Partner, 1):	return False
+		# # # # # # if not Partner.follows(Partner.feature('Morality'), self, self.feature('Morality')):	return False
+		# # # # # # if not Partner.follows(1, self, 1):	return False
+		# # # # # # print self.feature('MoralDemand'), '<=', Partner.feature('Morality')
+
+		# # # # # # # MM = min(Partner.feature('Morality'), self.feature('Morality'))
+		# # # # # # # # # if not self.acquaintable(Partner, MM):	return False
+
+		# # # # # # # # self considers following Partner 
+		# # # # # # # if Gbl.Param('SecondOrder'):
+			# # # # # # # for PF in Partner.friends():
+				# # # # # # # if PF.feature('Morality') < MM * Gbl.Param('Tolerance')/100.0:	return False
+		# # # # # # # if not self.follows(MM, Partner, MM):	return False
+		
+		# # # # # # # # Partner considers following back
+		# # # # # # # if Gbl.Param('SecondOrder'):
+			# # # # # # # for SF in self.friends():
+				# # # # # # # if SF.feature('Morality') < MM * Gbl.Param('Tolerance')/100.0:	return False
+		# # # # # # # return Partner.follows(MM, self, MM)
+		
+		
+		# # if self.get_friend(Partner, MM):	pass
+			# # # print self, '<--->', Partner, '(', MM, ')\n'
+		# # else:	pass
+			# # # print 'echec entre %s (%s)' % (self, self.best_friend()), 'et %s (%s)' % (Partner, Partner.best_friend()), '(', MM, ')'
+		return True
+
+	def assessment(self):
+		" Social benefit from having friends "
+		# cost of being moral
+		self.Points -= Gbl.Param('SignallingCost') * self.feature('Morality') / 100.0
+		# # # # Checks that self is its friends' friend
+		# # # self.restore_symmetry()
+		# for (Rank,Friend) in enumerate(self.friends()):
+			# # Friend.Points += Gbl.Param('JoiningBonus')
+		# # self.Points += 100 * Gbl.Saturate(self.nbFollowers(), Gbl.Param('JoiningBonus'))
+		if Gbl.Param('Evaluation').lower() == 'avg':
+			P = self.followers.performances()
+			if P:	self.Points += sum(P) / len(P)
+		elif Gbl.Param('Evaluation').lower() == 'max':
+			self.Points += self.followers.maximal()
+		elif Gbl.Param('Evaluation').lower() == 'min':
+			self.Points += self.followers.minimal()
+		else:	error('Unknown evaluation mode', Gbl.Param('Evaluation'))
+		return self.Points
+		
+	def __repr__(self):
+		# return "%s[%0.1f/%0.1f]" % (self.id, self.feature('Morality'), self.feature('MoralDemand'))
+		return "%s[%0.1f]" % (self.id, self.feature('Morality'))
+		
+class Population:
+	" defines the population of agents "
+
+	def __init__(self, NbAgents, Observer):
+		" creates a population of swallow agents "
+		self.Pop = [Individual(IdNb, NbAgents) for IdNb in range(NbAgents)]
+		self.PopSize = NbAgents
+		self.Obs = Observer
+		self.Obs.NbAgents = self.PopSize
+		self.Obs.Positions = self.positions()
+				 
+	def positions(self):
+		return dict([(A.id, A.Position) for A in self.Pop])
+
+	def neighbours(self, Agent):
+		" Returns a list of neighbours for an agent "
+		AgentQualityRank = self.Pop.index(Agent)
+		return [self.Pop[NBhood] for NBhood in [AgentQualityRank - 1, AgentQualityRank + 1]
+				if NBhood >= 0 and NBhood < self.PopSize]
+		  
+	def One_Run(self):
+		self.Obs.StepId += 1
+		# ====================
+		# Display
+		# ====================
+		if self.Obs.Visible():	# Statistics for display
+			for agent in self.Pop:
+				agent.update(infancy=self.Obs.hot_phase())	# update position for display
+				self.Obs.Positions[agent.id] = agent.Position
+			self.Obs.Alliances = [(agent.id, [T.id for T in Alliances.signature(agent)]) for agent in self.Pop]
+			self.Obs.Cluster = self.Clusters()[0]
+			if self.Pop:	
+				for F in self.Pop[0].Features.keys():
+					self.Obs.AvgFeatures[F] = float(sum([agent.feature(F) for agent in self.Pop]))/len(self.Pop)
+					
+		# ====================
+		# Interactions
+		# ====================
+		for Run in range(self.PopSize):	self.One_Step()
+		# print '%d ^ %d' % self.Clusters()[0]
+		return True	# This value is forwarded to "ReturnFromThread"
+
+	def One_Step(self):
+		" Interactions take place, then learning "
+		# This procedure is repeatedly called by the simulation thread
+		# ====================
+		# Social interactions
+		# ====================
+		for agent in self.Pop:
+			# agent.lessening_friendship()	# eroding past gurus performances
+			if Gbl.Param('EraseNetwork'):	agent.detach()
+			agent.Points = 0
+		for Run in range(Gbl.Param('NbRuns')):
+			(Player, Partner) = sample(self.Pop, 2)
+			Partner.Interact(Player)
+		# ====================
+		# Learning
+		# ====================
+		Learners = sample(self.Pop, int(len(self.Pop) * Gbl.Param('LearningProbability')/100.0))	# some agent learns
+		for agent in self.Pop:	agent.assessment()	# storing current scores (with possible cross-benefits)
+		for agent in self.Pop:
+			agent.wins(agent.Points)
+			if agent in Learners:
+				if not agent.Learns(self.neighbours(agent), hot=self.Obs.hot_phase()):
+					# agent.update()	# this is a newborn - update position for display
+					pass
+				# self.Obs.Positions[agent.id] = agent.Position
+		return True	 
+
+	def Dump(self, Slot):
+		""" Saving morality for each adult agent
+			and then distance to best friend for each adult agent having a best friend
+		"""
+		if Slot == 'Morality':
+			#D = [(agent.Quality, "%2.03f" % agent.feature('Morality')) for agent in self.Pop if agent.adult()]
+			#D += [(agent.Quality, " ") for agent in self.Pop if not agent.adult()]
+			D = [(agent.Quality, "%2.03f" % agent.feature('Morality')) for agent in self.Pop]
+		if Slot == 'DistanceToBestFriend':
+			D = [(int(agent.Quality), "%d" % abs(agent.best_friend().Quality - agent.Quality)) for agent in self.Pop if agent.adult() and agent.best_friend() is not None]
+			D += [(int(agent.Quality), " ") for agent in self.Pop if agent.best_friend() == None or not agent.adult()]
+		return [Slot] + [d[1] for d in sorted(D, key=lambda x: x[0])]
+
+	def Clusters(self):
+		" finding clusters of individuals "
+		# Groups individuals into bins based on x-position
+		Bins = [0] * Gbl.Param('NbBins')
+		BinSpacing = 100.0 / Gbl.Param('NbBins')
+		for agent in self.Pop:
+			for Bin in range(len(Bins)):
+				if agent.Position[0] >= BinSpacing * Bin and agent.Position[0] <= BinSpacing * Bin + Gbl.Param('BinWidth'):
+					Bins[Bin] += 1
+		# SBins = sorted(enumerate(Bins), key=lambda x: x[1])
+		# return [(int(sb[0]*BinSpacing + Gbl.Param('BinWidth')/2), int(sb[1])) for sb in SBins[-1:]]
+		BestBin = max(enumerate(Bins), key=lambda x: x[1])
+		return [(int(BestBin[0]*BinSpacing + Gbl.Param('BinWidth')/2), int(BestBin[1]))]
+		
+		
+		
+		
+def Start(BatchMode=False):
+	Observer = Social_Observer(Gbl.Parameters)   # Observer contains statistics
+	Observer.setOutputDir('___Results')
+	Observer.recordInfo('DefaultViews',	['Field', 'Network'])	# Evolife should start with that window open
+	Pop = Population(Observer.NbAgents, Observer)   # population of agents
+	
+	####################
+	# Batch mode
+	####################
+	if BatchMode :
+		# # # # for Step in range(Gbl.Param('TimeLimit')):
+			# # # # #print '.',
+			# # # # Pop.One_Run()
+			# # # # if os.path.exists('stop'):	break
+		Evolife.QtGraphics.Evolife_Batch.Start(Pop.One_Run, Observer)
+		# writing header to result file
+		open(Observer.get_info('ResultFile')+'.res','w').write(Observer.get_info('ResultHeader'))
+		# Gbl.Dump_(Pop.Dump, Observer.get_info('ResultFile'))
+		return
+
+	####################
+	# Interactive mode
+	####################
+	print __doc__
+	" launching window "
+	# Evolife.QtGraphics.Evolife_Window.Start(Pop.One_Run, Observer, Capabilities='FNCP', Options=[('BackGround','grey')])
+	Evolife.QtGraphics.Evolife_Window.Start(Pop.One_Run, Observer, Capabilities='FNCP', Options=[('BackGround','lightblue')])
+
+	# Gbl.Dump_(Pop.Dump, Observer.get_info('ResultFile'), Verbose=True)
+	print "Bye......."
+	sleep(2.1)	
+	return
+	
+
+
+if __name__ == "__main__":
+	Start(BatchMode=Gbl.Param('BatchMode'))
+
+
+
+__author__ = 'Dessalles'

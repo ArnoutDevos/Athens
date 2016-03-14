@@ -1,0 +1,2 @@
+Date;AgeMax;BatchMode;DNAFill;DisplayPeriod;DumpStart;GazelleToLionRatio;GeneCoding;GeneLength;GroupMinSize;HuntingRatio;Icon;JumpEnergy;MaxGurus;MutationRate;NbCrossover;NumberOfGroups;PopulationSize;ReproductionRate;ResultDir;Rounds;ScenarioName;SelectionPressure;Selectivity;StartFromFile;TimeLimit;Title;Vulnerability;LastStep;GazelleAvgThreshold;LionAvgThreshold;LionAvgScore
+160305224245;10;0;-1;10;100;80;0;8;0;10;QtGraphics/EvolifeIcon.png;20;1;5;1;1;200;20;./___Results;30;Gazelle;0;5;0;10000;Evolife;10;462;26;40;44
