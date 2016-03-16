@@ -86,6 +86,10 @@ class DNA(object):
 		# performing mutations
 		for mutation in range(mutation_number):
 			pos = random.randint(0, self.nb_nucleotides - 1)
+##			if(random.randint(0,99)<97):
+##				self.__dna[pos] = 0
+##			else:
+##				self.__dna[pos] = 1
 			self.__dna[pos] = 1 - self.__dna[pos]
 		return mutation_number
 

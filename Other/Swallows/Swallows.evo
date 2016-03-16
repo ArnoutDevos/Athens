@@ -4,11 +4,11 @@ GroupOffset	8
 GroupSlope	1
 Icon	swallow.gif
 Inertia	2
-NbAgents	200
+NbAgents	600
 RunConfigFile	_Params.evo
 ScenarioFileName	Swallows.evo
 ScenarioName	Swallows
 Target	Swallows.py
-TimeLimit	300
+TimeLimit	1000
 TimeSlope	20
 Title	Evolife_Swallows

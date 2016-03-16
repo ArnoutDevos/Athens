@@ -3,7 +3,7 @@ ApplicationDir	.
 BatchMode	0
 ControlGeneNumber	6
 DNAFill	-1
-DisplayPeriod	50
+DisplayPeriod	10
 DumpStart	100
 GeneCoding	1
 GeneLength	8
@@ -14,7 +14,7 @@ Icon	QtGraphics/EvolifeIcon.png
 MaxFollowers	54
 MaxGurus	5
 MigrationRate	10
-MutationRate	3
+MutationRate	10
 NbCrossover	1
 NoCoding	-1
 Noise	0
@@ -23,7 +23,7 @@ Parameter1	0
 Parameter2	0
 Parameter3	0
 Parameter4	0
-PopulationSize	100
+PopulationSize	10
 ReproductionRate	5
 ResultDir	./___Results
 Rounds	10

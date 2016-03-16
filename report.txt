@@ -1,0 +1,2 @@
+- convergence is slow due to binary representation e.g. 0111 to 1000 are next to each other but require a large mutation (all bits need to flip)
+- Algorithm is tested on trivial case of the resistive divider

@@ -3,7 +3,7 @@ BatchMode	0
 Rounds	10
 ControlGeneNumber	6
 DNAFill	-1
-DisplayPeriod	50
+DisplayPeriod	10
 DumpStart	100
 GeneCoding	1
 GeneLength	8
@@ -19,7 +19,7 @@ NoCoding	-1
 Noise	0
 Parameter1	0
 Parameter2	0
-PopulationSize	100
+PopulationSize	10
 ReproductionRate	5
 S_MyScenario	1
 SelectionPressure	5

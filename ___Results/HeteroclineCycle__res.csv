@@ -1,0 +1,2 @@
+Date;Absorption;AgeMax;AntidoteCost;BatchMode;DNAFill;DisplayPeriod;DumpStart;EmittedPoison;GeneCoding;GeneLength;GroupMinSize;Icon;MaxGurus;MutationRate;NbCrossover;NumberOfGroups;PoisonCost;PopulationSize;ReproductionRate;ResultDir;Rounds;ScenarioName;SelectionPressure;Selectivity;StartFromFile;TimeLimit;Title;LastStep;Pollution;TotalA;TotalC;TotalB
+160314164202;10;10;5;0;0;10;100;200;0;8;0;QtGraphics/EvolifeIcon.png;1;2;1;1;10;100;20;./___Results;1;HeteroclineCycle;20;0;0;10000;Evolife;1152;11;37;61;14

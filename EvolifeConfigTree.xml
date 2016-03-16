@@ -178,12 +178,12 @@
 				<Parameter Scenario="HeteroclineCycle">
 					<Name>AntidoteCost</Name>
 					<Description><info><![CDATA[Cost for generating antidote]]></info></Description>
-					<Value>5</Value>
+					<Value>10</Value>
 				</Parameter>
 				<Parameter Scenario="HeteroclineCycle">
 					<Name>Absorption</Name>
 					<Description><info><![CDATA[Fraction <b>per thousand</b> of the total poison quantity that an individual absorbs]]></info></Description>
-					<Value>10</Value>
+					<Value>1</Value>
 				</Parameter>
 			</Parameter>
 			<Parameter>
@@ -369,7 +369,7 @@
 		<Parameter>
 			<Name>PopulationSize</Name>
 			<Description><info><![CDATA[The size of the population is maintained constant <br><br>]]></info></Description>
-			<Value>100</Value>
+			<Value>10</Value>
 		</Parameter>
 		<Parameter>
 			<Name>MigrationRate</Name>
@@ -440,7 +440,7 @@
 		<Parameter>
 			<Name>MutationRate</Name>
 			<Description><info><![CDATA[Mutation rate in xxx/1000 <br>]]></info></Description>
-			<Value>3</Value>
+			<Value>10</Value>
 		</Parameter>
 		<Parameter>
 			<Name>NbCrossover</Name>
@@ -497,7 +497,7 @@
 		<Parameter>
 			<Name>DisplayPeriod</Name>
 			<Description><info><![CDATA[Period between successive plots <br>0:&nbsp;&nbsp;no plot<br>1:&nbsp;&nbsp;plot every year<br>10: typical<br><br>]]></info></Description>
-			<Value>50</Value>
+			<Value>10</Value>
 		</Parameter>
 		<Parameter>
 			<Name>TimeLimit</Name>
