@@ -497,7 +497,7 @@
 		<Parameter>
 			<Name>DisplayPeriod</Name>
 			<Description><info><![CDATA[Period between successive plots <br>0:&nbsp;&nbsp;no plot<br>1:&nbsp;&nbsp;plot every year<br>10: typical<br><br>]]></info></Description>
-			<Value>10</Value>
+			<Value>1</Value>
 		</Parameter>
 		<Parameter>
 			<Name>TimeLimit</Name>

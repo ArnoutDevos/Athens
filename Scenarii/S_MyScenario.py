@@ -71,6 +71,7 @@ if __name__ == '__main__':  sys.path.append('../..')  # for tests
 from Evolife.Scenarii.Default_Scenario import Default_Scenario
 
 import numpy as np
+from scipy import interpolate
 import ahkab
 from ahkab import ahkab, circuit, time_functions
 import pylab
@@ -94,13 +95,8 @@ class Scenario(Default_Scenario):
 		[('genename1', 8), ('genename2', 4),...]:   numbers give lengths in bits; coding is retrieved from configuration
 		[('genename1', 8, 'Weighted'), ('genename2', 4, 'Unweighted'),...]:	coding can be 'Weighted', 'Unweighted', 'Gray', 'NoCoding'
 		"""
-		return [('W1',8, 'Weighted'), ('L1',8, 'Weighted'), ('R1',8, 'Weighted')] 
-		#return [('R1',8, 'Weighted'), ('R2',8, 'Weighted')]
-		
-		#Put here the declaration of W1 L1 R W2 L2
-		# W = [100e-9 800e-9] [m]
-		# L = [1e-6 3e-6] [m]
-		# R = [100 1000] [ohm]
+		return [('W1',8, 'Weighted'), ('L1',8, 'Weighted'), ('R1',8, 'Weighted')] # For OTA simulation
+		#return [('R1',8, 'Weighted'), ('R2',8, 'Weighted')] #For resistive divider simulation
 
 	def phenemap(self):
 		""" Defines the set of non inheritable characteristics
@@ -109,8 +105,8 @@ class Scenario(Default_Scenario):
 
 	def evaluation(self, Indiv):
 
-		#score = self.score_resistiveDivider(Indiv)
-		score = self.score_ota(Indiv)
+		#score = self.score_resistiveDivider(Indiv) # Resistive divider simulation
+		score = self.score_ota(Indiv) # OTA simulation
 		
 		Indiv.score(score, FlagSet=True)
 		
@@ -149,6 +145,7 @@ class Scenario(Default_Scenario):
 	
 	def score_ota(self, Indiv):
 		
+		# Use physical values for Width, Length and Resistance in Si Units
 		minimalW = 1e-6
 		minimalL = 10e-9
 		minimalR = 10
@@ -196,12 +193,54 @@ class Scenario(Default_Scenario):
 		
 		ota.add_isource('ib', n1='n1', n2=gnd, dc_value=1e-3)
 
-		ac_analysis = ahkab.new_ac(start=1e3, stop=1e5, points=3)
+		ac_analysis = ahkab.new_ac(start=1e6, stop=1e10, points=10)
 
 		r = ahkab.run(ota, ac_analysis)
 		
-		score = np.abs(r['ac']['VN3'][2]-r['ac']['VN2'][2])*100/Vac
+		Output = np.abs(r['ac']['VN3']-r['ac']['VN2'])
 		
+		## Gain calculation
+		Gain = Output[2]/Vac
+		score = Gain
+		
+		
+		## Bandwidth calculation
+		# Normalize the output to the low frequency value and convert to array
+		norm_out = np.abs(Output)/np.abs(Output).max()
+		
+		# Convert to dB
+		#norm_out_db = 20*np.log10(norm_out)
+		
+		
+		# Convert angular frequencies to Hz and convert matrix to array
+		frequencies = r['ac']['f']
+		#print r['ac'].keys()
+		
+		print norm_out
+		print frequencies
+		# call scipy to interpolate
+		
+		x1 = norm_out
+		y1 = frequencies
+		
+		# Combine lists into list of tuples
+		points = zip(x1, y1)
+
+		# Sort list of tuples by x-value
+		points = sorted(points, key=lambda point: point[0])
+
+		# Split list of tuples into two list of x values any y values
+		x1, y1 = zip(*points)
+		
+		frequencies_interpolated = interpolate.interp1d(x1, y1)
+		
+		if 0.5 > min(x1):
+			print frequencies_interpolated(0.5)
+			Bandwidth = frequencies_interpolated(0.5)
+		else:
+			Bandwith = 0
+		
+		score = Gain*Bandwidth
 		print score
 		
 		return score

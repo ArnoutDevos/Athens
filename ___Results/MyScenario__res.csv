@@ -1,2 +1,2 @@
 Date;AgeMax;BatchMode;DNAFill;DisplayPeriod;DumpStart;GeneCoding;GeneLength;GroupMinSize;Icon;MaxGurus;MutationRate;NbCrossover;NumberOfGroups;PopulationSize;ReproductionRate;ResultDir;Rounds;ScenarioName;SelectionPressure;Selectivity;StartFromFile;TimeLimit;Title;LastStep;best;average
-160317113016;0;0;-1;10;100;1;8;0;QtGraphics/EvolifeIcon.png;5;3;1;1;10;5;./___Results;10;MyScenario;5;0;0;20000;Evolife;551;299;293
+160317155936;0;0;-1;1;100;1;8;0;QtGraphics/EvolifeIcon.png;5;3;1;1;10;5;./___Results;10;MyScenario;5;0;0;20000;Evolife;133;213328157;204396276

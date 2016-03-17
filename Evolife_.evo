@@ -1,7 +1,7 @@
 AgeMax	0
 BatchMode	0
 DNAFill	-1
-DisplayPeriod	10
+DisplayPeriod	1
 DumpStart	100
 GeneCoding	1
 GeneLength	8
