@@ -7,63 +7,28 @@
 
 
 ##############################################################################
-#  S_MyScenario : a scenario that uses a Genetic Algorithm for Analog Circuit#
-#				  optimization. 											 #
-##############################################################################
+#  S_CircuitDesign : a scenario that uses a Genetic Algorithm for Analog	 #
+#				  	 Circuit optimization. 									 #
+# 		 	 17/03/2016					                        Arnout Devos #
+#            Telecom ParisTech  2016                     www.arnoutdevos.net #
+##############################################################################	
 
-	#   If your scenario is 'XXX', copy this file to S_XXX.py.
-	#   Indicate your name, date, context and abstract.
-	#   Change the scenario name in the Evolife Configuration Editor
-	#   for the [Run] button to execute S_XXX.py.
-	#   You may have to edit the Evolife Configuration File (EvolifeConfigTree.xml)
-	#   (exit from the Configuration Editor first!)
-	#   to add new parameters. You may use you favorite editor (e.g. Emacs or Notepad++)
-	#   or a specialized xml editor such as "Serna XML Editor" (available for free).
-	#   Insert a section for your scenario by copy and modifying an existing scenario section.
-	#   Then run the Evolife Configuration Editor again
-		
+""" EVOLIFE: CircuitDesign Scenario: a scenario that uses a Genetic Algorithm 
+			 for Analog Circuit optimization.
 
-""" EVOLIFE: Empty Scenario: This scenario does nothing ! It is supposed to be customized.
+packages to import:
+ahkab : The Spice simulator used
+numpy : To have the absolute value function
+scipy : To use interpolation for the 3dB bandwidth calculation
 
-	Evolife scenarii may rewrite several functions listed here :
-	(those marked with '+' are called from 'Group.py')
-	(those marked with 'o' are called from 'Observer.py')
-	
-	COPY-PASTE the required functions from Default_Scenario.py
+WATCH OUT: the package for the spice simulator (ahkab) is not standard, one 
+		   needs to install it from: https://ahkab.github.io/ahkab/
 
-	- initialization(self): allows to define local variables
-	- genemap(self):	initialises the genes on the gene map (see 'Genetic_map.py')
-	- phenemap(self):   defines a list of phenotypic character names (see 'Phenotype.py')
-	+ season(self, year):   makes periodic actions like resetting parameters
-	+ behaviour(self, BestIndiv, AvgIndiv):   defines a behaviour to be displayed
-	+ life_game(self, members): defines a round of interactions - calls the five following functions
-		- start_game(self, members):	group-level initialization before starting interactions
-			- prepare(self, indiv): individual initialization before starting interactions
-		- interaction(self, Indiv, Partner):	defines a single interaction 
-			- partner(self, Indiv, members):	select a partner among 'members' that will interact with 'Indiv'
-		- end_game(self, members):  an occasion for a closing round after all interactions
-		- evaluation(self, Indiv):  defines how the score of an individual is computed
-		- lives(self, members): converts scores into life points
-	+ couples(self, members): returns a list of couples for procreation (individuals may appear in several couples!)- Calls the following function:
-		- parents(self, candidates):	selects two parents from a list of candidates (candidate = (indiv, NbOfPotentialChildren))
-	+ new_agent(self, child, parents): initializes newborns
-	+ remove_agent(self, agent): action to be performed when an agent dies
-	+ update_positions(self, members, groupID):	assigns a position to agents
-	o default_view(self): says which windows should be open at start up
-	o legends(self): returns a string to be displayed at the bottom ot the Legend window.
-	o display_(self):   says which statistics are displayed each year
-	o local_display_(self):   allows to display locally defined values
-	o wallpaper(self, Window):	if one wants to display different backgrounds in windows
-
-						************
-
-	You may pick those function from actual scenarios as well.
-
+INFO: Resistive divider example provides an easy way to understand the code 
+	  and is well documented. This resistive divider simulation can be executed 
+	  by switching to the resistive divider functions in genemap(self) and 
+	  evaluation(self, Indiv).
 """
-
-	#=============================================================#
-	#  HOW TO MODIFY A SCENARIO: read Default_Scenario.py		 #
-	#=============================================================#
 
 import sys
 if __name__ == '__main__':  sys.path.append('../..')  # for tests
@@ -73,9 +38,7 @@ from Evolife.Scenarii.Default_Scenario import Default_Scenario
 
 import numpy as np
 from scipy import interpolate
-import ahkab
 from ahkab import ahkab, circuit, time_functions
-import pylab
 
 ######################################
 # specific variables and functions   #
@@ -161,6 +124,8 @@ class Scenario(Default_Scenario):
 		
 		# Reference ground
 		gnd = ota.get_ground_node()
+		
+		# This makes sure nodes are uniquely defined
 		n1 = ota.create_node('n1') # Top of current source
 		
 		n2 = ota.create_node('n2') # Output-, Drain of MOS1 (left)
@@ -175,6 +140,8 @@ class Scenario(Default_Scenario):
 		print W
 		print L
 		print R
+		
+		# Add all the components to the circuit
 		ota.add_resistor("R1", 'n4', 'n2', value=R)
 		ota.add_resistor("R2", 'n4', 'n3', value=R)
 		
@@ -186,6 +153,7 @@ class Scenario(Default_Scenario):
 		ota.add_mos('m1', nd='n2', ng='n5', ns='n1', nb=gnd, model_label='nmos', w=W, l=L)
 		ota.add_mos('m2', nd='n3', ng='n6', ns='n1', nb=gnd, model_label='nmos', w=W, l=L)
 		
+		# Use a small signal amplitude
 		Vac = 0.02
 		ota.add_vsource("V1", n1="n5", n2=gnd, dc_value=0.5, ac_value=Vac)
 		ota.add_vsource("V2", n1="n6", n2=gnd, dc_value=0.5, ac_value=-Vac)
@@ -193,11 +161,13 @@ class Scenario(Default_Scenario):
 		ota.add_vsource("V3", n1="n4", n2=gnd, dc_value=2, ac_value=0)
 		
 		ota.add_isource('ib', n1='n1', n2=gnd, dc_value=1e-3)
-
+		
+		# The circuit is frequency dependent, so an AC analysis is required. Bandwith will be a FOM.
 		ac_analysis = ahkab.new_ac(start=1e6, stop=1e10, points=10)
 
 		r = ahkab.run(ota, ac_analysis)
 		
+		# The output voltage between the two drains of the transistors is used.
 		Output = np.abs(r['ac']['VN3']-r['ac']['VN2'])
 		
 		## Gain calculation
@@ -209,18 +179,12 @@ class Scenario(Default_Scenario):
 		# Normalize the output to the low frequency value and convert to array
 		norm_out = np.abs(Output)/np.abs(Output).max()
 		
-		# Convert to dB
-		#norm_out_db = 20*np.log10(norm_out)
-		
-		
-		# Convert angular frequencies to Hz and convert matrix to array
 		frequencies = r['ac']['f']
-		#print r['ac'].keys()
 		
 		print norm_out
 		print frequencies
-		# call scipy to interpolate
 		
+		# Find the 3dB frequency. This is defined as the Bandwidth
 		x1 = norm_out
 		y1 = frequencies
 		
@@ -241,6 +205,7 @@ class Scenario(Default_Scenario):
 		else:
 			Bandwith = 0
 		
+		# The total score function is based on both Gain and Bandwidth
 		score = Gain*Bandwidth
 		print score
 		
