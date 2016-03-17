@@ -8,7 +8,7 @@ GeneLength	8
 GroupMinSize	0
 Icon	QtGraphics/EvolifeIcon.png
 MaxGurus	5
-MutationRate	10
+MutationRate	3
 NbCrossover	1
 NumberOfGroups	1
 PopulationSize	10

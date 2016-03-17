@@ -14,7 +14,7 @@ Icon	QtGraphics/EvolifeIcon.png
 MaxFollowers	54
 MaxGurus	5
 MigrationRate	10
-MutationRate	10
+MutationRate	3
 NbCrossover	1
 NoCoding	-1
 Noise	0

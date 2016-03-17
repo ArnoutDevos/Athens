@@ -440,7 +440,7 @@
 		<Parameter>
 			<Name>MutationRate</Name>
 			<Description><info><![CDATA[Mutation rate in xxx/1000 <br>]]></info></Description>
-			<Value>10</Value>
+			<Value>3</Value>
 		</Parameter>
 		<Parameter>
 			<Name>NbCrossover</Name>

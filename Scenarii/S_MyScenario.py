@@ -94,8 +94,8 @@ class Scenario(Default_Scenario):
 		[('genename1', 8), ('genename2', 4),...]:   numbers give lengths in bits; coding is retrieved from configuration
 		[('genename1', 8, 'Weighted'), ('genename2', 4, 'Unweighted'),...]:	coding can be 'Weighted', 'Unweighted', 'Gray', 'NoCoding'
 		"""
-		#return [('W1',8, 'Weighted'), ('L1',8, 'Weighted'), ('R1',8, 'Weighted')] 
-		return [('R1',8, 'Weighted'), ('R2',8, 'Weighted')]
+		return [('W1',8, 'Weighted'), ('L1',8, 'Weighted'), ('R1',8, 'Weighted')] 
+		#return [('R1',8, 'Weighted'), ('R2',8, 'Weighted')]
 		
 		#Put here the declaration of W1 L1 R W2 L2
 		# W = [100e-9 800e-9] [m]
@@ -109,7 +109,8 @@ class Scenario(Default_Scenario):
 
 	def evaluation(self, Indiv):
 
-		score = self.score_resistiveDivider(Indiv)
+		#score = self.score_resistiveDivider(Indiv)
+		score = self.score_ota(Indiv)
 		
 		Indiv.score(score, FlagSet=True)
 		
@@ -148,47 +149,62 @@ class Scenario(Default_Scenario):
 	
 	def score_ota(self, Indiv):
 		
-		W=Indiv.gene_value('W1')+1
-		L=Indiv.gene_value('L1')+1
-		R=Indiv.gene_value('R1')+1
+		minimalW = 1e-6
+		minimalL = 10e-9
+		minimalR = 10
 		
-		#dumbscore = (W/L)*R
+		W=(Indiv.gene_value('W1')+1)*minimalW
+		L=(Indiv.gene_value('L1')+1)*minimalL
+		R=(Indiv.gene_value('R1')+1)*minimalR
 
 		## Couple with spice simulator and extract GBW
 		# Create new circuit
-		mycircuit = circuit.Circuit(title="Operational Transconductance Amplifier Circuit")
+		ota = circuit.Circuit(title="Operational Transconductance Amplifier Circuit")
 		
 		# Reference ground
-		gnd = mycircuit.get_ground_node()
-		n1 = mycircuit.create_node('n1')
-		n2 = mycircuit.create_node('n2')
+		gnd = ota.get_ground_node()
+		n1 = ota.create_node('n1') # Top of current source
 		
-		#print W
-		#print R
-		mycircuit.add_resistor("R1", 'n1', 'n2', value=W)
-		mycircuit.add_resistor("R2", 'n2', gnd, value=R)
+		n2 = ota.create_node('n2') # Output-, Drain of MOS1 (left)
+		n3 = ota.create_node('n3') # Output+, Drain of MOS2 (right)
+		
+		n4 = ota.create_node('n4') # Power supply
+		
+		n5 = ota.create_node('n5') # Bias of gate +
+		n6 = ota.create_node('n6') # Bias of gate -
+		
+		print 'variables'
+		print W
+		print L
+		print R
+		ota.add_resistor("R1", 'n4', 'n2', value=R)
+		ota.add_resistor("R2", 'n4', 'n3', value=R)
+		
+		ota.add_capacitor('c1', n1='n2', n2=gnd, value=5e-12)
+		ota.add_capacitor('c2', n1='n3', n2=gnd, value=5e-12)
+		
+		ota.add_model('ekv', 'nmos', dict(TYPE='n', VTO=.4, KP=10e-6))
+		
+		ota.add_mos('m1', nd='n2', ng='n5', ns='n1', nb=gnd, model_label='nmos', w=W, l=L)
+		ota.add_mos('m2', nd='n3', ng='n6', ns='n1', nb=gnd, model_label='nmos', w=W, l=L)
+		
+		Vac = 0.02
+		ota.add_vsource("V1", n1="n5", n2=gnd, dc_value=0.5, ac_value=Vac)
+		ota.add_vsource("V2", n1="n6", n2=gnd, dc_value=0.5, ac_value=-Vac)
+		
+		ota.add_vsource("V3", n1="n4", n2=gnd, dc_value=2, ac_value=0)
+		
+		ota.add_isource('ib', n1='n1', n2=gnd, dc_value=1e-3)
 
-		mycircuit.add_vsource("V1", n1="n1", n2=gnd, dc_value=4, ac_value=1)
-		
-		#op_analysis = ahkab.new_op()
 		ac_analysis = ahkab.new_ac(start=1e3, stop=1e5, points=3)
+
+		r = ahkab.run(ota, ac_analysis)
 		
-		#opa = ahkab.new_op()
-		r = ahkab.run(mycircuit, ac_analysis)
+		score = np.abs(r['ac']['VN3'][2]-r['ac']['VN2'][2])*100/Vac
 		
-		#print r['op'].results
-		#print r['ac']['VN2']
-		#print np.abs(r['ac']['VN2'][1])
+		print score
 		
-		#dumbscore = np.abs(r['ac']['VN2'][1])*100
-		
-		#dumbscore = r['op']['VN2']*10
-		
-		#Indiv.score(dumbscore, FlagSet=True)
-		
-		# some stupid behaviour, to be replaced
-		#if self.Parameter('Parameter1') == self.Parameter('Parameter2'):
-			#Indiv.score(10)
+		return score
 		
 	def display_(self):
 		""" Defines what is to be displayed. It offers the possibility
