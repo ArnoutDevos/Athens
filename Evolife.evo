@@ -28,7 +28,7 @@ ReproductionRate	5
 ResultDir	./___Results
 Rounds	10
 RunConfigFile	Evolife.evo
-ScenarioFileName	Expe/MyScenario.evo
+ScenarioFileName	Expe/CircuitDesign.evo
 ScenarioName	MyScenario
 SelectionPressure	5
 Selectivity	0
